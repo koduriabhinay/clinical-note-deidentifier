@@ -1,13 +1,12 @@
 # clinical-note-deidentifier
 
-Hybrid PHI (protected health information) de-identification pipeline for clinical notes:
-a **regex/rules layer** for structured PHI plus a **trained scikit-learn token classifier**
-for person names, merged recall-first and served behind a FastAPI endpoint.
+A hybrid PHI (protected health information) de-identification pipeline for clinical notes:
+a regex rules layer for structured PHI plus a trained scikit-learn token classifier for person
+names, merged recall-first and served by a FastAPI endpoint.
 
-> **Synthetic by design.** Every name, date, phone number, MRN, address, and email in
-> this project is fictitious — generated programmatically from fixed pools with a fixed
-> random seed (`seed=42`). **No real patient data is used, stored, or produced anywhere
-> in this repository.**
+**Data.** All notes are synthetic. Names, dates, phone numbers, MRNs, addresses and emails are
+generated from fixed pools with a fixed seed (`seed=42`). No real patient data is used or stored
+in this repository.
 
 ## Results (held-out test set, exact span + type match)
 
@@ -29,12 +28,12 @@ Model selection (3-fold GroupKFold grouped by note, token-level micro-F1):
 | logistic_regression | 0.9999 | 0.0001 |
 | **random_forest** (selected) | 1.0000 | 0.0000 |
 
-- **17/17 pytest tests pass** (`pytest tests/`)
-- Held-out names are genuinely unseen: test notes use name pools disjoint from training.
-- Honest caveat: perfect scores reflect the regularity of the *synthetic* note templates.
-  Real clinical text is messier — abbreviations, typos, and dictated notes would degrade
-  these numbers. The value here is the pipeline architecture and the eval harness, not
-  the absolute scores.
+Test notes draw names from pools disjoint from the training pools, so held-out names are never
+seen during training.
+
+The perfect scores reflect the regularity of the synthetic note templates. Real clinical text,
+with abbreviations, typos and dictation artefacts, would score lower. What this project
+demonstrates is the pipeline design and the evaluation harness, not the absolute numbers.
 
 ## Architecture
 
@@ -47,10 +46,10 @@ clinical note text
       └─► ML layer ── whitespace tokenizer w/ char offsets (src/tokenize.py)
                        orthographic + context + gazetteer features (src/features.py)
                        DictVectorizer → RandomForest (src/model.py)
-                       (handles PATIENT / PROVIDER names — no reliable surface pattern)
+                       (handles PATIENT / PROVIDER names: no reliable surface pattern)
               │
               ▼
-   merge: union of both layers (recall-first — a missed PHI is the failure
+   merge: union of both layers (recall-first: a missed PHI is the failure
    that matters); on span conflicts the rules layer wins on type.
               │
               ▼
@@ -80,13 +79,13 @@ scripts/
   evaluate.py    pretty-print metrics.json
   redact.py      redact one note from the CLI
 tests/
-  test_pipeline.py   17 tests: data gen, tokenizer, features, rules, hybrid,
-                     eval math, FastAPI endpoint
+  test_pipeline.py   data generation, tokenizer, features, rules, hybrid merge,
+                     metric calculations, FastAPI endpoint
 app.py           FastAPI service: POST /redact, GET /health
 Dockerfile       trains the pipeline at build time (fully offline, deterministic)
 ```
 
-## Run it
+## Quickstart
 
 ```bash
 pip install -r requirements.txt
@@ -107,14 +106,18 @@ curl -X POST localhost:8000/redact -H 'Content-Type: application/json' \
   -d '{"text": "Patient Mary Johnson, DOB 01/05/1980."}'
 ```
 
-Or with Docker (trains inside the image build — no data or model files needed):
+Or with Docker (the model is trained during the image build, so no data or model files are needed):
 
 ```bash
 docker build -t clinical-note-deidentifier .
 docker run -p 8000:8000 clinical-note-deidentifier
 ```
 
-## Tech
+## Stack
 
-Python, scikit-learn, regex/NLP, FastAPI, Pydantic, Docker, pytest. No deep-learning
-frameworks, no model downloads — the whole pipeline trains and runs offline.
+Python, scikit-learn, FastAPI, Pydantic, Docker, pytest. No deep learning framework or model
+downloads; the pipeline trains and runs offline.
+
+## License
+
+MIT, see [LICENSE](LICENSE).
